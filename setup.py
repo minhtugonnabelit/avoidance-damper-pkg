@@ -11,9 +11,10 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
+        # Only need to list package.xml once
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/collision_damper.launch.py']),
+        # This is a more robust way to install all launch files
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -25,6 +26,7 @@ setup(
     entry_points={
         'console_scripts': [
             'simple_collision_damper = avoidance_damper_pkg.simple_collision_damper:main',
+            'collision_damper_lifecycle_node = avoidance_damper_pkg.collision_damper_lifecycle_node:main',
         ],
     },
 )

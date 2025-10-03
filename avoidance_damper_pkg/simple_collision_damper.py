@@ -326,43 +326,29 @@ class SimpleCollisionDamperNode(Node):
                                                                        coverage_angle=self.side_coverage)
         self.latest_hit_mask = hit_mask
 
-        # perform pre-damped motion on incoming cmd_vel
-        linear_vel = [
-            self._cmd_vel.linear.x * self.cmd_vel_limit,
-            self._cmd_vel.linear.y * self.cmd_vel_limit,
-        ]
-        angular_vel = self._cmd_vel.angular.z
-        
         # Apply directional damper to cmd_vel and get sector risks for visualization
         if self.using_cmd_vel:
-            self.get_logger().info(f"sector_points has {len(sector_points)}")
-            lin_vel_damped, ang_vel_damped, self._damping_gain, self.latest_sector_risks = (
-                self._damper_core.directional_damper(
-                    linear_vel=linear_vel, angular_vel=angular_vel,
-                    hit_mask=hit_mask,
-                    sector_points=sector_points,
-                    apply_to_velocity=self.using_cmd_vel,
-                    d_stop=self.dist_thresh[0] * self.coverage_radius,
-                    d_warn=self.dist_thresh[1] * self.coverage_radius,
-                    return_sector_risks=True,
-                )   
+            self._damped_cmd_vel, self._damping_gain, self.latest_sector_risks = self._damper_core.directional_damper(
+                cmd_vel=self._cmd_vel,
+                hit_mask=hit_mask,
+                sector_points=sector_points,
+                using_cmd_vel=self.using_cmd_vel,
+                d_stop=self.dist_thresh[0] * self.coverage_radius,
+                d_warn=self.dist_thresh[1] * self.coverage_radius,
+                return_sector_risks=True,
             )
-            damped = Twist()
-            damped.linear.x = float(lin_vel_damped[0])
-            damped.linear.y = float(lin_vel_damped[1])
-            damped.angular.z = float(ang_vel_damped)
-            self._damped_cmd_vel = damped
             if self._damped_cmd_vel is not None:
+                 
                 if min(self._damping_gain) < 0.1:
                     self.get_logger().error(f"Damping gain too low: {self._damping_gain}")
                 else:
                     self.get_logger().info(f"Damping gain: {self._damping_gain}")
         else:
             self._damping_gain, self.latest_sector_risks = self._damper_core.directional_damper(
-                linear_vel=linear_vel, angular_vel=angular_vel,
+                cmd_vel=self._cmd_vel,
                 hit_mask=hit_mask,
                 sector_points=sector_points,
-                apply_to_velocity=self.using_cmd_vel,
+                using_cmd_vel=self.using_cmd_vel,
                 d_stop=self.dist_thresh[0] * self.coverage_radius,
                 d_warn=self.dist_thresh[1] * self.coverage_radius,
                 return_sector_risks=True,
@@ -371,10 +357,8 @@ class SimpleCollisionDamperNode(Node):
                 self.get_logger().info(f"Calculated damping gain: {np.max(self._damping_gain):.3f}")
 
         self.damper_publisher_.publish(Float64MultiArray(data=self._damping_gain.tolist()))
+        self.damped_cmd_vel_publisher_.publish(self._damped_cmd_vel)
 
-        if self.using_cmd_vel:
-            self.damped_cmd_vel_publisher_.publish(self._damped_cmd_vel)
-            
     def cmd_vel_callback(self, msg: Twist):
         self._cmd_vel = msg
 
